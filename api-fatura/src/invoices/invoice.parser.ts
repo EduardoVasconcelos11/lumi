@@ -17,17 +17,19 @@ export async function parseInvoicePDF(filePath: string): Promise<InvoiceData> {
   const dataBuffer = fs.readFileSync(filePath);
   const data = await pdfParse(dataBuffer);
   const lines = data.text.split('\n').map(l => l.trim()).filter(Boolean);
-  const normalize = (input: string) => input.replace('.', '').replace(',', '.');
+
+  const normalize = (input: string): string =>
+    input.replace(/\./g, '').replace(',', '.');
 
   const findNextLineValue = (label: string, digitCount: number = 10): string => {
     const index = lines.findIndex(line => line.includes(label));
-    if (index === -1 || index + 1 >= lines.length) throw new Error(`Não encontrado: ${label}`);
+    if (index === -1 || index + 1 >= lines.length)
+      throw new Error(`Não encontrado: ${label}`);
     const nextLine = lines[index + 1];
     const match = nextLine.match(new RegExp(`(\\d{${digitCount}})`));
     if (!match) throw new Error(`Número não encontrado após ${label}`);
     return match[1];
   };
-
 
   const clientNumber = findNextLineValue('Nº DO CLIENTE');
 
@@ -37,7 +39,6 @@ export async function parseInvoicePDF(filePath: string): Promise<InvoiceData> {
   }
 
   const referenceLine = lines[referenceIdx + 1];
-
   const referenceRaw = referenceLine.match(/([A-Z]{3}\/\d{4})/i)?.[1];
   if (!referenceRaw) throw new Error('Formato de referência inválido');
 
@@ -48,25 +49,36 @@ export async function parseInvoicePDF(filePath: string): Promise<InvoiceData> {
   const [mes, ano] = referenceRaw.split('/');
   const referenceMonth = `${monthMap[mes.toUpperCase()]}/${ano}`;
 
+  // Energia Elétrica
   const energiaEletricaLine = lines.find(l => l.includes('Energia ElétricakWh'));
   if (!energiaEletricaLine) throw new Error('Energia Elétrica não encontrada');
-  const matchEletrica = energiaEletricaLine.match(/kWh\s+(\d+)\s+[\d.,]+\s+([\d.,]+)/);
-  const energiaEletricaKwh = parseFloat(normalize(matchEletrica![1]));
-  const energiaEletricaReais = parseFloat(normalize(matchEletrica![2]));
+  const matchEletrica = energiaEletricaLine.match(/kWh\s+([\d.]+)\s+[\d.,]+\s+([\d.,]+)/);
+  if (!matchEletrica) throw new Error(`Erro ao extrair Energia Elétrica. Linha: "${energiaEletricaLine}"`);
+  const energiaEletricaKwh = parseFloat(normalize(matchEletrica[1]));
+  const energiaEletricaReais = parseFloat(normalize(matchEletrica[2]));
 
+  // Energia SCEE
   const energiaSCEEline = lines.find(l => l.includes('Energia SCEE s/ ICMSkWh'));
-  const matchSCEE = energiaSCEEline?.match(/kWh\s+(\d+)\s+[\d.,]+\s+([\d.,]+)/);
-  const energiaSCEEEKwh = parseFloat(normalize(matchSCEE![1]));
-  const energiaSCEEReais = parseFloat(normalize(matchSCEE![2]));
+  if (!energiaSCEEline) throw new Error('Energia SCEE não encontrada');
+  const matchSCEE = energiaSCEEline.match(/kWh\s+([\d.]+)\s+[\d.,]+\s+([\d.,]+)/);
+  if (!matchSCEE) throw new Error(`Erro ao extrair dados de Energia SCEE. Linha: "${energiaSCEEline}"`);
+  const energiaSCEEEKwh = parseFloat(normalize(matchSCEE[1]));
+  const energiaSCEEReais = parseFloat(normalize(matchSCEE[2]));
 
+  // Energia GD (Compensada)
   const energiaGDline = lines.find(l => l.includes('Energia compensada GD IkWh'));
-  const matchGD = energiaGDline?.match(/kWh\s+(\d+)\s+[\d.,]+\s+(-?[\d.,]+)/);
-  const energiaCompensadaKwh = parseFloat(normalize(matchGD![1]));
-  const energiaCompensadaReais = parseFloat(normalize(matchGD![2]));
+  if (!energiaGDline) throw new Error('Energia GD não encontrada');
+  const matchGD = energiaGDline.match(/kWh\s+([\d.]+)\s+[\d.,]+\s+(-?[\d.,]+)/);
+  if (!matchGD) throw new Error(`Erro ao extrair Energia GD. Linha: "${energiaGDline}"`);
+  const energiaCompensadaKwh = parseFloat(normalize(matchGD[1]));
+  const energiaCompensadaReais = parseFloat(normalize(matchGD[2]));
 
+  // Contribuição Iluminação Pública
   const contribLine = lines.find(l => l.includes('Contrib Ilum Publica Municipal'));
-  const matchIlum = contribLine?.match(/([\d.,]+)$/);
-  const contribuicaoIlumReais = parseFloat(normalize(matchIlum![1]));
+  if (!contribLine) throw new Error('Contribuição de Iluminação Pública não encontrada');
+  const matchIlum = contribLine.match(/([\d.,]+)$/);
+  if (!matchIlum) throw new Error(`Erro ao extrair valor da contribuição. Linha: "${contribLine}"`);
+  const contribuicaoIlumReais = parseFloat(normalize(matchIlum[1]));
 
   return {
     clientNumber,

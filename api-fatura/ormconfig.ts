@@ -10,7 +10,8 @@ const AppDataSource = new DataSource({
   password: '159753',
   database: 'energia_lumi',
   entities: [Invoice],
-  migrations: ['src/migrations/**/*.ts'],
+  // entities: ["dist/**/*.entity.js"], 
+  migrations: ["dist/migrations/*.js"], // mesmo esquema
   synchronize: false,
 });
 

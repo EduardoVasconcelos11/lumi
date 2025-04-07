@@ -1,0 +1,34 @@
+services:
+  backend:
+    build:
+      context: ./api-fatura
+    container_name: api-fatura
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/postgres
+
+  frontend:
+    build:
+      context: ./front-lumi
+    container_name: front-lumi
+    ports:
+      - "5173:4173" # 4173 é o padrão do `vite preview`
+
+  postgres:
+    image: postgres:15
+    container_name: postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

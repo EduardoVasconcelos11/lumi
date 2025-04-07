@@ -32,6 +32,9 @@ export class Invoice {
   @Column('decimal')
   contribuicaoIlumReais: number;
 
+  @Column({ nullable: true }) // antes estava false ou nem tinha nullable
+  filename?: string;  
+
   @CreateDateColumn()
   createdAt: Date;
 }
